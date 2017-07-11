@@ -197,7 +197,6 @@ class ApplicationEntity(object):
         self.address = platform.node()
         self.port = port
         self.ae_title = ae_title
-        self.sslsupport = False
 
         # Avoid dangerous default values
         if transfer_syntax is None:
