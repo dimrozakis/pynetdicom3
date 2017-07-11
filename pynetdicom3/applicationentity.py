@@ -18,7 +18,6 @@ from pydicom.uid import ExplicitVRLittleEndian, ImplicitVRLittleEndian, \
 from pynetdicom3.association import Association
 from pynetdicom3.utils import PresentationContext, validate_ae_title
 
-
 def setup_logger():
     """Setup the logger."""
     logger = logging.getLogger('pynetdicom3')
@@ -64,6 +63,7 @@ class ApplicationEntity(object):
 
                 # Must return a valid C-STORE status - 0x0000 is Success
                 return 0x0000
+
             ae.on_c_store = on_c_store
 
             # Start the SCP
@@ -413,7 +413,6 @@ class ApplicationEntity(object):
                                 dimse_timeout=self.dimse_timeout)
             assoc.start()
             self.active_associations.append(assoc)
-
 
     def cleanup_associations(self):
         """Remove dead associations.
