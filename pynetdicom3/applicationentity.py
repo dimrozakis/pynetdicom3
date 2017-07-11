@@ -11,7 +11,6 @@ from struct import pack
 import sys
 import time
 import ssl
-from exceptions import RuntimeError
 
 from pydicom.uid import ExplicitVRLittleEndian, ImplicitVRLittleEndian, \
                         ExplicitVRBigEndian, UID, InvalidUID
@@ -392,33 +391,28 @@ class ApplicationEntity(object):
 
         # If theres a connection
         if read_list:
-            _socket, _ = self.local_socket.accept()
-            try:
-                if self.has_ssl:
-                    client_socket = ssl.wrap_socket(_socket,
-                                                    server_side=True,
-                                                    certfile=self.certfile,
-                                                    keyfile=self.keyfile,
-                                                    cert_reqs=self.cert_verify,
-                                                    ca_certs=self.cacerts,
-                                                    ssl_version=self.ssl_version)
-                else:
-                    client_socket = _socket
-                client_socket.setsockopt(socket.SOL_SOCKET,
-                                         socket.SO_RCVTIMEO,
-                                         pack('ll', 10, 0))
+            client_socket, _ = self.local_socket.accept()
+            if self.has_ssl:
+                client_socket = ssl.wrap_socket(client_socket,
+                                                server_side=True,
+                                                certfile=self.certfile,
+                                                keyfile=self.keyfile,
+                                                cert_reqs=self.cert_verify,
+                                                ca_certs=self.cacerts,
+                                                ssl_version=self.ssl_version)
+            client_socket.setsockopt(socket.SOL_SOCKET,
+                                     socket.SO_RCVTIMEO,
+                                     pack('ll', 10, 0))
 
-                # Create a new Association
-                # Association(local_ae, local_socket=None, max_pdu=16382)
-                assoc = Association(self,
-                                    client_socket,
-                                    max_pdu=self.maximum_pdu_size,
-                                    acse_timeout=self.acse_timeout,
-                                    dimse_timeout=self.dimse_timeout)
-                assoc.start()
-                self.active_associations.append(assoc)
-            except Exception as e:
-                LOGGER.error(str(e))
+            # Create a new Association
+            # Association(local_ae, local_socket=None, max_pdu=16382)
+            assoc = Association(self,
+                                client_socket,
+                                max_pdu=self.maximum_pdu_size,
+                                acse_timeout=self.acse_timeout,
+                                dimse_timeout=self.dimse_timeout)
+            assoc.start()
+            self.active_associations.append(assoc)
 
 
     def cleanup_associations(self):
