@@ -170,7 +170,7 @@ class ApplicationEntity(object):
                  scp_sop_class=None, transfer_syntax=None,
                  certfile=None, keyfile=None,
                  cacerts='/etc/ssl/certs/ca-certificates.crt',
-                 cert_verify=True, version=ssl.PROTOCOL_SSLv23):
+                 cert_verify=True, version='sslv23'):
         """Create a new Application Entity.
 
         Parameters
@@ -233,7 +233,7 @@ class ApplicationEntity(object):
             self.cacerts = cacerts
             self.cert_verify = ssl.CERT_REQUIRED if cert_verify else ssl.CERT_NONE
 
-            ssl_version = {
+            ssl_versions = {
                     'sslv23': ssl.PROTOCOL_SSLv23,
                     'tlsv1': ssl.PROTOCOL_TLSv1,
                     'tlsv1_1': ssl.PROTOCOL_TLSv1_1,
@@ -244,10 +244,12 @@ class ApplicationEntity(object):
             else:
                 raise RuntimeError("The SSL/TLS version you specified is not "
                                    "currently supported.\nPlease provide one "
-                                   "of the following values "
-                                   "[sslv23, tlsv1, tlsv1_1, tlsv1_2]")
+                                   "of %s." % ssl_versions.keys())
 
             LOGGER.debug('DICOM communication over ' + version)
+        elif certfile or keyfile:
+            raise RuntimeError("In order to use SSL/TLS communication you "
+                               "need to provide both certfile and keyfile")
         else:
             LOGGER.debug('DICOM communication without SSL/TLS')
 
@@ -403,13 +405,16 @@ class ApplicationEntity(object):
         if read_list:
             client_socket, _ = self.local_socket.accept()
             if self.has_ssl:
-                client_socket = ssl.wrap_socket(client_socket,
-                                                server_side=True,
-                                                certfile=self.certfile,
-                                                keyfile=self.keyfile,
-                                                cert_reqs=self.cert_verify,
-                                                ca_certs=self.cacerts,
-                                                ssl_version=self.ssl_version)
+                try:
+                    client_socket = ssl.wrap_socket(client_socket,
+                                                    server_side=True,
+                                                    certfile=self.certfile,
+                                                    keyfile=self.keyfile,
+                                                    cert_reqs=self.cert_verify,
+                                                    ca_certs=self.cacerts,
+                                                    ssl_version=self.ssl_version)
+                except Exception as e:
+                    LOGGER.error(str(e))
             client_socket.setsockopt(socket.SOL_SOCKET,
                                      socket.SO_RCVTIMEO,
                                      pack('ll', 10, 0))
