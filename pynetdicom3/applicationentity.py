@@ -216,6 +216,11 @@ class ApplicationEntity(object):
         self.transfer_syntaxes = transfer_syntax
 
         self.has_ssl = False
+        self.certfile = None
+        self.keyfile = None
+        self.cert_verify = None
+        self.cacerts = None
+        self.ssl_version = None
         # Check if ssl parameters are complete
         if certfile and keyfile:
             self.certfile = certfile
@@ -228,18 +233,23 @@ class ApplicationEntity(object):
             self.cacerts = cacerts
             self.cert_verify = ssl.CERT_REQUIRED if cert_verify else ssl.CERT_NONE
 
-            ssl_versions = ['tls', 'tlsv1', 'tlsv1_1', 'tlsv1_2']
+            ssl_version = {
+                    'sslv23': ssl.PROTOCOL_SSLv23,
+                    'tlsv1': ssl.PROTOCOL_TLSv1,
+                    'tlsv1_1': ssl.PROTOCOL_TLSv1_1,
+                    'tlsv1_2': ssl.PROTOCOL_TLSv1_2,
+            }
             if version in ssl_versions:
-                self.ssl_version = ssl_versions.index(version)+2
+                self.ssl_version = ssl_versions[version]
             else:
                 raise RuntimeError("The SSL/TLS version you specified is not "
                                    "currently supported.\nPlease provide one "
                                    "of the following values "
-                                   "[tls, tlsv1, tlsv1_1, tlsv1_2]")
+                                   "[sslv23, tlsv1, tlsv1_1, tlsv1_2]")
 
+            LOGGER.debug('DICOM communication over ' + version)
         else:
-            raise RuntimeError("SSL/TLS configuration is not valid.\n"
-                               "Please provide certfile, keyfile")
+            LOGGER.debug('DICOM communication without SSL/TLS')
 
 
         # The user may require the use of Extended Negotiation items
