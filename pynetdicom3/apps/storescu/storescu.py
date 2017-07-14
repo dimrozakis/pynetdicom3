@@ -84,6 +84,26 @@ def _setup_argparser():
                           type=str,
                           default='ANY-SCP')
 
+    # SSL/TLS Options
+    ssl_opts = parser.add_argument_group('SSL/TLS Options')
+    ssl_opts.add_argument("-cert", "--cert-file", metavar='[p]ath',
+                          help="set the file path of the certificate file",
+                          type=str)
+    ssl_opts.add_argument("-key", "--key-file", metavar='[p]ath',
+                          help="set the file path of the private key file",
+                          type=str)
+    ssl_opts.add_argument("-validation", "--cert-validation",
+                          help="set the file path of the private key file",
+                          action="store_true")
+    ssl_opts.add_argument("-version", "--ssl-version", metavar='[p]ath',
+                          help="set the file path of the private key file",
+                          type=str,
+                          choices=['sslv23', 'tlsv1', 'tlsv1_1', 'tlsv1_2'])
+    ssl_opts.add_argument("-cacerts", "--cacerts-file", metavar='[p]ath',
+                          help="set the file path of the certificates"
+                               " authority file",
+                          type=str)
+
     # Transfer Syntaxes
     ts_opts = parser.add_mutually_exclusive_group()
     ts_opts.add_argument("-xe", "--request-little",
