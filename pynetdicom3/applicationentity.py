@@ -164,7 +164,17 @@ class ApplicationEntity(object):
         Specifies which version of the SSL protocol to use. Typically,
         the server chooses a particular protocol version, and the client must
         adapt to the server's choice
-        """
+    """
+
+    # Association class type is set to a variable to make usage of another
+    # maybe overidden type of Association easier
+    #Example:
+    #    class MyApplicationEntity(ApplicationEntity):
+    #        ASSOCIATION = MyAssociation
+    #
+    ASSOCIATION = Association
+
+
     # pylint: disable=too-many-instance-attributes,too-many-public-methods
     def __init__(self, ae_title='PYNETDICOM', port=0, scu_sop_class=None,
                  scp_sop_class=None, transfer_syntax=None,
@@ -421,11 +431,11 @@ class ApplicationEntity(object):
 
             # Create a new Association
             # Association(local_ae, local_socket=None, max_pdu=16382)
-            assoc = Association(self,
-                                client_socket,
-                                max_pdu=self.maximum_pdu_size,
-                                acse_timeout=self.acse_timeout,
-                                dimse_timeout=self.dimse_timeout)
+            assoc = self.ASSOCIATION(self,
+                                     client_socket,
+                                     max_pdu=self.maximum_pdu_size,
+                                     acse_timeout=self.acse_timeout,
+                                     dimse_timeout=self.dimse_timeout)
             assoc.start()
             self.active_associations.append(assoc)
 
@@ -499,12 +509,12 @@ class ApplicationEntity(object):
                    'Port' : port}
 
         # Associate
-        assoc = Association(local_ae=self,
-                            peer_ae=peer_ae,
-                            acse_timeout=self.acse_timeout,
-                            dimse_timeout=self.dimse_timeout,
-                            max_pdu=max_pdu,
-                            ext_neg=ext_neg)
+        assoc = self.ASSOCIATION(local_ae=self,
+                                 peer_ae=peer_ae,
+                                 acse_timeout=self.acse_timeout,
+                                 dimse_timeout=self.dimse_timeout,
+                                 max_pdu=max_pdu,
+                                 ext_neg=ext_neg)
         assoc.start()
 
         # Endlessly loops while the Association negotiation is taking place
