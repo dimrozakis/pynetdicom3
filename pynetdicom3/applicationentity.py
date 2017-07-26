@@ -430,6 +430,9 @@ class ApplicationEntity(object):
                                                     ssl_version=self.ssl_version)
                 except Exception as e:
                     LOGGER.error(str(e))
+                    client_socket.close()
+                    return
+                    
             client_socket.setsockopt(socket.SOL_SOCKET,
                                      socket.SO_RCVTIMEO,
                                      pack('ll', 10, 0))
