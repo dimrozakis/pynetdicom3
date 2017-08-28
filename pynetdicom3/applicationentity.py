@@ -1,6 +1,7 @@
 """
 The main user class, represents a DICOM Application Entity
 """
+import os
 import gc
 from inspect import isclass
 import logging
@@ -141,29 +142,6 @@ class ApplicationEntity(object):
         The SOP Classes supported when acting as an SCP (SCP only)
     transfer_syntaxes : List of pydicom.uid.UID
         The supported transfer syntaxes
-    # ######### SSL/TLS Parameters ############################ #
-    # For more information please visit:                        #
-    # Python2.7: https://docs.python.org/2.7/library/ssl.html   #
-    # Python3: https://docs.python.org/3/library/ssl.html       #
-    # ######################################################### #
-
-    certfile : File path
-        The certificate file for SSL/TLS communication over DICOM
-    keyfile : File path
-        The key file for SSL/TLS communication over DICOM
-    cert_verify: ssl.CERT_NONE or ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED
-        Specifies whether a certificate is required from the other side of the
-        connection, and whether it will be validated if provided.
-        If the value of this parameter is not CERT_NONE, then the ca_certs
-        parameter must point to a file of CA certificates.
-    cacerts: File path
-        File contains a set of concatenated "certification authority"
-        certificates, which are used to validate certificates passed
-        from the other end of the connection.
-    version: tls (for sslv2 and sslv3 support), tlsv1, tlsv1_1, tlsv1_2
-        Specifies which version of the SSL protocol to use. Typically,
-        the server chooses a particular protocol version, and the client must
-        adapt to the server's choice
     """
 
     # Association class type is set to a variable to make usage of another
@@ -221,7 +199,6 @@ class ApplicationEntity(object):
         # The transfer syntax(es) available to the AE
         #   At a minimum this must be ... FIXME
         self.transfer_syntaxes = transfer_syntax
-
 
         # The user may require the use of Extended Negotiation items
         self.extended_negotiation = []
@@ -384,6 +361,9 @@ class ApplicationEntity(object):
                                                     ssl_version=self.ssl_version)
                 except Exception as e:
                     LOGGER.error(str(e))
+                    client_socket.close()
+                    return
+                    
             client_socket.setsockopt(socket.SOL_SOCKET,
                                      socket.SO_RCVTIMEO,
                                      pack('ll', 10, 0))
@@ -492,6 +472,12 @@ class ApplicationEntity(object):
                 cacerts='/etc/ssl/certs/ca-certificates.crt',
                 cert_verify=False, version='sslv23'):
         """Add SSL/TLS layer to DICOM communication.
+        # ######### SSL/TLS Parameters ############################ #
+        # For more information please visit:                        #
+        # Python2.7: https://docs.python.org/2.7/library/ssl.html   #
+        # Python3: https://docs.python.org/3/library/ssl.html       #
+        # ######################################################### #
+
 
         Parameters
         ----------
@@ -521,7 +507,11 @@ class ApplicationEntity(object):
         self.cacerts = None
         self.ssl_version = None
         # Check if ssl parameters are complete
-        if certfile and keyfile:
+        if (certfile and keyfile):
+            if not os.path.exists(certfile):
+                raise OSError(2, 'No such certificate file', certfile)
+            if not os.path.exists(keyfile):
+                raise OSError(2, 'No such private key file', keyfile)
             self.certfile = certfile
             self.keyfile = keyfile
             self.has_ssl = True
@@ -551,7 +541,6 @@ class ApplicationEntity(object):
                                "need to provide both certfile and keyfile")
         else:
             LOGGER.debug('DICOM communication without SSL/TLS')
-
 
 
     def __str__(self):
