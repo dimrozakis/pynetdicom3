@@ -287,8 +287,8 @@ ae = AE(ae_title=args.calling_aet,
         port=0,
         scu_sop_class=[VerificationSOPClass],
         scp_sop_class=[],
-        transfer_syntax=transfer_syntaxes,
-        **sslargs)
+        transfer_syntax=transfer_syntaxes)
+ae.add_ssl(**sslargs)
 
 # Set timeouts
 ae.network_timeout = args.timeout

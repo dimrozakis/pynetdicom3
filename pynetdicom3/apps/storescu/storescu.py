@@ -175,8 +175,8 @@ ae = AE(ae_title=args.calling_aet,
         port=0,
         scu_sop_class=StorageSOPClassList,
         scp_sop_class=[],
-        transfer_syntax=transfer_syntax,
-        **sslargs)
+        transfer_syntax=transfer_syntax)
+ae.add_ssl(**sslargs)
 
 # Request association with remote
 assoc = ae.associate(args.peer, args.port, args.called_aet)

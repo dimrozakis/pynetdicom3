@@ -181,6 +181,7 @@ class ApplicationEntity(object):
         self.address = platform.node()
         self.port = port
         self.ae_title = ae_title
+        self.has_ssl = False
 
         # Avoid dangerous default values
         if transfer_syntax is None:
@@ -468,9 +469,9 @@ class ApplicationEntity(object):
 
         return assoc
 
-    def add_ssl(certfile=None, keyfile=None,
+    def add_ssl(self, certfile=None, keyfile=None,
                 cacerts='/etc/ssl/certs/ca-certificates.crt',
-                cert_verify=False, version='sslv23'):
+                cert_verify=True, version='sslv23'):
         """Add SSL/TLS layer to DICOM communication.
         # ######### SSL/TLS Parameters ############################ #
         # For more information please visit:                        #
@@ -500,7 +501,6 @@ class ApplicationEntity(object):
             adapt to the server's choice
         """
 
-        self.has_ssl = False
         self.certfile = None
         self.keyfile = None
         self.cert_verify = None
