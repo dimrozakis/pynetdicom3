@@ -1,6 +1,7 @@
 """
 The main user class, represents a DICOM Application Entity
 """
+import os
 import gc
 from inspect import isclass
 import logging
@@ -10,9 +11,10 @@ import socket
 from struct import pack
 import sys
 import time
+import ssl
 
 from pydicom.uid import ExplicitVRLittleEndian, ImplicitVRLittleEndian, \
-                        ExplicitVRBigEndian, UID, InvalidUID
+                        ExplicitVRBigEndian, UID
 
 from pynetdicom3.association import Association
 from pynetdicom3.utils import PresentationContext, validate_ae_title
@@ -141,6 +143,16 @@ class ApplicationEntity(object):
     transfer_syntaxes : List of pydicom.uid.UID
         The supported transfer syntaxes
     """
+
+    # Association class type is set to a variable to make usage of another
+    # maybe overidden type of Association easier
+    #Example:
+    #    class MyApplicationEntity(ApplicationEntity):
+    #        ASSOCIATION = MyAssociation
+    #
+    ASSOCIATION = Association
+
+
     # pylint: disable=too-many-instance-attributes,too-many-public-methods
     def __init__(self, ae_title='PYNETDICOM', port=0, scu_sop_class=None,
                  scp_sop_class=None, transfer_syntax=None):
@@ -169,6 +181,7 @@ class ApplicationEntity(object):
         self.address = platform.node()
         self.port = port
         self.ae_title = ae_title
+        self.has_ssl = False
 
         # Avoid dangerous default values
         if transfer_syntax is None:
@@ -338,17 +351,31 @@ class ApplicationEntity(object):
         # If theres a connection
         if read_list:
             client_socket, _ = self.local_socket.accept()
+            if self.has_ssl:
+                try:
+                    client_socket = ssl.wrap_socket(client_socket,
+                                                    server_side=True,
+                                                    certfile=self.certfile,
+                                                    keyfile=self.keyfile,
+                                                    cert_reqs=self.cert_verify,
+                                                    ca_certs=self.cacerts,
+                                                    ssl_version=self.ssl_version)
+                except Exception as e:
+                    LOGGER.error(str(e))
+                    client_socket.close()
+                    return
+                    
             client_socket.setsockopt(socket.SOL_SOCKET,
                                      socket.SO_RCVTIMEO,
                                      pack('ll', 10, 0))
 
             # Create a new Association
             # Association(local_ae, local_socket=None, max_pdu=16382)
-            assoc = Association(self,
-                                client_socket,
-                                max_pdu=self.maximum_pdu_size,
-                                acse_timeout=self.acse_timeout,
-                                dimse_timeout=self.dimse_timeout)
+            assoc = self.ASSOCIATION(self,
+                                     client_socket,
+                                     max_pdu=self.maximum_pdu_size,
+                                     acse_timeout=self.acse_timeout,
+                                     dimse_timeout=self.dimse_timeout)
             assoc.start()
             self.active_associations.append(assoc)
 
@@ -422,12 +449,12 @@ class ApplicationEntity(object):
                    'Port' : port}
 
         # Associate
-        assoc = Association(local_ae=self,
-                            peer_ae=peer_ae,
-                            acse_timeout=self.acse_timeout,
-                            dimse_timeout=self.dimse_timeout,
-                            max_pdu=max_pdu,
-                            ext_neg=ext_neg)
+        assoc = self.ASSOCIATION(local_ae=self,
+                                 peer_ae=peer_ae,
+                                 acse_timeout=self.acse_timeout,
+                                 dimse_timeout=self.dimse_timeout,
+                                 max_pdu=max_pdu,
+                                 ext_neg=ext_neg)
         assoc.start()
 
         # Endlessly loops while the Association negotiation is taking place
@@ -441,6 +468,80 @@ class ApplicationEntity(object):
             self.active_associations.append(assoc)
 
         return assoc
+
+    def add_ssl(self, certfile=None, keyfile=None,
+                cacerts='/etc/ssl/certs/ca-certificates.crt',
+                cert_verify=True, version='sslv23'):
+        """Add SSL/TLS layer to DICOM communication.
+        # ######### SSL/TLS Parameters ############################ #
+        # For more information please visit:                        #
+        # Python2.7: https://docs.python.org/2.7/library/ssl.html   #
+        # Python3: https://docs.python.org/3/library/ssl.html       #
+        # ######################################################### #
+
+
+        Parameters
+        ----------
+        certfile : File path
+            The certificate file for SSL/TLS communication over DICOM
+        keyfile : File path
+            The key file for SSL/TLS communication over DICOM
+        cert_verify: ssl.CERT_NONE or ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED
+            Specifies whether a certificate is required from the other side of the
+            connection, and whether it will be validated if provided.
+            If the value of this parameter is not CERT_NONE, then the ca_certs
+            parameter must point to a file of CA certificates.
+        cacerts: File path
+            File contains a set of concatenated "certification authority"
+            certificates, which are used to validate certificates passed
+            from the other end of the connection.
+        version: tls (for sslv2 and sslv3 support), tlsv1, tlsv1_1, tlsv1_2
+            Specifies which version of the SSL protocol to use. Typically,
+            the server chooses a particular protocol version, and the client must
+            adapt to the server's choice
+        """
+
+        self.certfile = None
+        self.keyfile = None
+        self.cert_verify = None
+        self.cacerts = None
+        self.ssl_version = None
+        # Check if ssl parameters are complete
+        if (certfile and keyfile):
+            if not os.path.exists(certfile):
+                raise OSError(2, 'No such certificate file', certfile)
+            if not os.path.exists(keyfile):
+                raise OSError(2, 'No such private key file', keyfile)
+            self.certfile = certfile
+            self.keyfile = keyfile
+            self.has_ssl = True
+            if cert_verify:
+                if not cacerts:
+                    raise RuntimeError("Please provide certification authority"
+                                       " certificates file for validation")
+            self.cacerts = cacerts
+            self.cert_verify = ssl.CERT_REQUIRED if cert_verify else ssl.CERT_NONE
+
+            ssl_versions = {
+                    'sslv23': ssl.PROTOCOL_SSLv23,
+                    'tlsv1': ssl.PROTOCOL_TLSv1,
+                    'tlsv1_1': ssl.PROTOCOL_TLSv1_1,
+                    'tlsv1_2': ssl.PROTOCOL_TLSv1_2,
+            }
+            if version in ssl_versions:
+                self.ssl_version = ssl_versions[version]
+            else:
+                raise RuntimeError("The SSL/TLS version you specified is not "
+                                   "currently supported.\nPlease provide one "
+                                   "of %s." % ssl_versions.keys())
+
+            LOGGER.debug('DICOM communication over ' + version)
+        elif certfile or keyfile:
+            raise RuntimeError("In order to use SSL/TLS communication you "
+                               "need to provide both certfile and keyfile")
+        else:
+            LOGGER.debug('DICOM communication without SSL/TLS')
+
 
     def __str__(self):
         """ Prints out the attribute values and status for the AE """
@@ -683,9 +784,7 @@ class ApplicationEntity(object):
             else:
                 continue
 
-            try:
-                sop_uid.is_valid()
-            except InvalidUID:
+            if not sop_uid.is_valid:
                 continue
 
             self._scu_supported_sop.append(sop_uid)
@@ -732,9 +831,7 @@ class ApplicationEntity(object):
             else:
                 continue
 
-            try:
-                sop_uid.is_valid()
-            except InvalidUID:
+            if not sop_uid.is_valid:
                 continue
 
             self._scp_supported_sop.append(sop_uid)
@@ -763,9 +860,7 @@ class ApplicationEntity(object):
             else:
                 raise ValueError("Transfer syntax SOP class must be a "
                                  "UID str, UID bytes or UID.")
-            try:
-                sop_uid.is_valid()
-            except InvalidUID:
+            if not sop_uid.is_valid:
                 raise ValueError("Transfer syntax contained an "
                                  "invalid UID string")
 
