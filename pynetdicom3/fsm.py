@@ -149,6 +149,7 @@ def AE_1(dul):
         LOGGER.error(exc)
         dul.to_user_queue.put(None)
         dul.scu_socket.close()
+        return 'Sta1'
 
     return 'Sta4'
 
