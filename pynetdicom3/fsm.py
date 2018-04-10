@@ -140,12 +140,13 @@ def AE_1(dul):
         # CalledPresentationAddress is set by the ACSE and
         #   is an (address, port) tuple
         dul.scu_socket.connect(dul.primitive.called_presentation_address)
-    except socket.error:
+    except socket.error as exc:
         # Failed to connect
         LOGGER.error("Association Request Failed: Failed to establish "
                      "association")
         LOGGER.error("Peer aborted Association (or never connected)")
         LOGGER.error("TCP Initialisation Error: Connection refused")
+        LOGGER.error(exc)
         dul.to_user_queue.put(None)
         dul.scu_socket.close()
 
