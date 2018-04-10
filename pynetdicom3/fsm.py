@@ -126,6 +126,8 @@ def AE_1(dul):
     """
     # Issue TRANSPORT CONNECT request primitive to local transport service
     dul.scu_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if dul.assoc.ae.network_timeout:
+        dul.scu_socket.settimeout(dul.assoc.ae.network_timeout)
     try:
         if dul.assoc.ae.has_ssl:
             dul.scu_socket = ssl.wrap_socket(dul.scu_socket,
